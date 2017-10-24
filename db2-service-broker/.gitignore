@@ -1,0 +1,18 @@
+# swagger
+swagger/swagger.json
+swagger/swagger.yml
+
+# idea
+.idea
+*.iml
+*.exe
+*.exe~
+*.tmp
+
+# beego
+routers/commentsRouter_controllers.go
+db2-service-broker.exe
+lastupdate.tmp
+
+# golang package
+base/go1.7.5.linux-amd64.tar.gz

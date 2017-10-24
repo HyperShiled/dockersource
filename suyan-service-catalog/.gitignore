@@ -1,0 +1,10 @@
+.idea/
+suyan-service-catalog.iml
+suyan-service-catalog.exe
+suyan-service-catalog.exe~
+suyan-service-catalog
+lastupdate.tmp
+swagger/swagger.json
+swagger/swagger.yml
+routers/comments*.go
+.DS_Store

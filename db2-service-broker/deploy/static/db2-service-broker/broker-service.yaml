@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: db2-service-broker
+  labels:
+    app: db2-service-broker
+spec:
+  selector:
+    app: db2-service-broker
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000

@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: postgresql-service-broker
+  labels:
+    app: postgresql-service-broker
+spec:
+  selector:
+    app: postgresql-service-broker
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000

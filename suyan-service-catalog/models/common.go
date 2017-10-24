@@ -1,0 +1,6 @@
+package models
+
+const (
+	OPERATE_RESULT_SUCCESS = 1
+	OPERATE_RESULT_FAILURE = 0
+)

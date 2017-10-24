@@ -1,0 +1,16 @@
+# Default values for User-Provided Service Broker
+# Image to use
+image: neunnsy/postgresql-service-broker:v0.0.1
+# ImagePullPolicy; valid values are "IfNotPresent", "Never", and "Always"
+imagePullPolicy: IfNotPresent
+
+# Etcd Image to use
+etcdImage: quay.io/coreos/etcd:v3.0.17
+
+# Etcd StorageClass
+storageClass: neunn-nfs
+
+# Broker Auth Info
+brokerAuthInfo:
+  username: "suyan"
+  password: "12345678"

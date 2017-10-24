@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mongodb-service-broker
+  labels:
+    app: mongodb-service-broker
+spec:
+  selector:
+    app: mongodb-service-broker
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000

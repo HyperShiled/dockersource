@@ -1,0 +1,63 @@
+# This file should not be used in deployed environments. Instead, set
+# the SETTINGS_PATH environment variable to point to a configuration
+# file that contains these settings.
+
+services:
+- name: postgresql-service
+  id: 3102c871-1044-4716-a7dc-9ded2e028291
+  description: PostgreSQL service for application development and testing
+  bindable: true
+  tags:
+    - postgresql
+    - relational
+  metadata:
+    providerDisplayName: experimental
+    imageUrl: http://orvjyath1.bkt.clouddn.com/postgresql.png
+    # serviceType: database cache message-queue
+    serviceType: database
+    longDescription: |
+      # PostgreSQL Service Broker Description
+
+      用于对接外部PostgreSQL集群服务,遵守ServiceBroker API规范.
+      [Open Service Broker](https://www.openservicebrokerapi.org/)
+
+
+      更多信息,
+      [请访问 GitHub 上 Service Catalog 项目](https://github.com/kubernetes-incubator/service-catalog).
+    basicInformation: |
+      # PostgreSQL Service Broker Basic Information
+
+      用于对接外部PostgreSQL集群服务,遵守ServiceBroker API规范.
+      [Open Service Broker](https://www.openservicebrokerapi.org/)
+
+
+      更多信息,
+      [请访问 GitHub 上 Service Catalog 项目](https://github.com/kubernetes-incubator/service-catalog).
+    configParam: |
+      ## 配置参数描述
+      ```
+      service_name: 服务的名字
+      plan_name: 套餐的名字
+      connect_uri: 数据库链接字符串
+      ```
+    howToUse: |
+      ## 参数使用说明
+      ```
+      service_name: postgresql-service
+      plan_name: default
+      connect_uri: postgres://postgres:12345678@192.168.21.87:5432?sslmode=disable
+      ```
+  plans:
+  - name: default
+    id: 2651da21-dc16-4c1a-ba6c-1c681a3dpgc1
+    description: Shared PostgreSQL Server
+    free: true
+    bindable: true
+    metadata:
+     costs:
+     - amount:
+         value: 0
+       unit: U
+     bullets:
+       - Shared PostgreSQL server
+       - free storage

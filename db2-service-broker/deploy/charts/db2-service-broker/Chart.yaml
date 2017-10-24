@@ -1,0 +1,14 @@
+name: db2-service-broker
+description: user-provided db2-service-broker deployment Helm chart.
+home: http://www.neunn.com
+icon: http://orvjyath1.bkt.clouddn.com/db2_logo_image.png
+keywords:
+- servicebroker
+maintainers:
+- email: wang-x@neunn.com
+  name: www.neunn.com
+sources:
+- https://www.neunn.com
+version: 0.0.1
+engine: gotpl
+

@@ -1,0 +1,14 @@
+name: mysql-service-broker
+description: user-provided mysql-service-broker deployment Helm chart.
+home: http://www.neunn.com
+icon: https://www.mysql.com/common/logos/logo-mysql-170x115.png
+keywords:
+- servicebroker
+maintainers:
+- email: wang-x@neunn.com
+  name: www.neunn.com
+sources:
+- https://www.neunn.com
+version: 0.0.1
+engine: gotpl
+

@@ -1,0 +1,59 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: mongodb-service-broker
+  labels:
+    app: mongodb-service-broker
+spec:
+  serviceName: mongodb-service-broker
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mongodb-service-broker
+    spec:
+      containers:
+      - name: mongodb-service-broker
+        image: neunnsy/mongodb-service-broker:v0.0.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        readinessProbe:
+          tcpSocket:
+            port: 8000
+          failureThreshold: 1
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        livenessProbe:
+          tcpSocket:
+            port: 8000
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        volumeMounts:
+        - name: mongodb-service-broker
+          mountPath: /go/src/github.com/compassorg/mongodb-service-broker/conf
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.0.17
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: data
+          mountPath: /default.etcd
+      volumes:
+      - name: mongodb-service-broker
+        configMap:
+          name: mongodb-service-broker
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      annotations:
+        volume.beta.kubernetes.io/storage-class: standard
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

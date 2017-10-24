@@ -1,0 +1,15 @@
+# swagger
+swagger/swagger.json
+swagger/swagger.yml
+
+# idea
+.idea
+*.iml
+*.exe
+*.exe~
+*.tmp
+
+# beego
+routers/commentsRouter_controllers.go
+mysql-service-broker.exe
+lastupdate.tmp

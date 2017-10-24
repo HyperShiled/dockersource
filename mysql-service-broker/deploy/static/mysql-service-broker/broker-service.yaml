@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mysql-service-broker
+  labels:
+    app: mysql-service-broker
+spec:
+  selector:
+    app: mysql-service-broker
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000

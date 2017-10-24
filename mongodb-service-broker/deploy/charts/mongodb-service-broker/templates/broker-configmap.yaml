@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}
+data:
+  app.conf: |+
+    appname = mongodb-service-broker
+    httpport = 8000
+    runmode = dev
+    autorender = false
+    copyrequestbody = true
+    EnableDocs = true
+
+    include "mongodb-service-broker.conf"
+  mongodb-service-broker.conf: |+
+    [mongodb-service-broker]
+    settings.path="conf/settings.yaml"
+
+    [etcd]
+    endpoints="http://127.0.0.1:2379"
+    # For multi endpoints. endpoints="http://192.168.86.131:2379,http://192.168.86.132:2379,http://192.168.86.133:2379"
+
+    [auth]
+    username="{{ .Values.brokerAuthInfo.username }}"
+    password="{{ .Values.brokerAuthInfo.password }}"
+  settings.yaml:  |+
+    # This file should not be used in deployed environments. Instead, set
+    # the SETTINGS_PATH environment variable to point to a configuration
+    # file that contains these settings.
+
+    services:
+    - name: mongodb-service
+      id: 3102c871-1044-4716-a7dc-9ded2e028391
+      description: MongoDB service for application development and testing
+      bindable: true
+      tags:
+        - mongodb
+        - relational
+      metadata:
+        providerDisplayName: experimental
+        imageUrl: http://orvjyath1.bkt.clouddn.com/mongodb-logo.jpg
+        # serviceType: database cache message-queue
+        serviceType: database
+        longDescription: |
+          # MongoDB Service Broker Description
+
+          用于对接外部MongoDB集群服务,遵守ServiceBroker API规范.
+          [Open Service Broker](https://www.openservicebrokerapi.org/)
+
+
+          更多信息,
+          [请访问 GitHub 上 Service Catalog 项目](https://github.com/kubernetes-incubator/service-catalog).
+        basicInformation: |
+          # MongoDB Service Broker Basic Information
+
+          用于对接外部MongoDB集群服务,遵守ServiceBroker API规范.
+          [Open Service Broker](https://www.openservicebrokerapi.org/)
+
+
+          更多信息,
+          [请访问 GitHub 上 Service Catalog 项目](https://github.com/kubernetes-incubator/service-catalog).
+        configParam: |
+          ## 配置参数描述
+          ```
+          service_name: 服务的名字
+          plan_name: 套餐的名字
+          connect_uri: 数据库链接字符串
+          ```
+        howToUse: |
+          ## 参数使用说明
+          ```
+          service_name: mongodb-service
+          plan_name: default
+          connect_uri: super:12345678@192.168.21.87:27017
+          ```
+      plans:
+      - name: default
+        id: 2651da21-dc16-4c1a-ba6c-1c681a3dmgc1
+        description: Shared MongoDB Server
+        free: true
+        bindable: true
+        metadata:
+         costs:
+         - amount:
+             value: 0
+           unit: U
+         bullets:
+           - Shared MongoDB server
+           - free storage

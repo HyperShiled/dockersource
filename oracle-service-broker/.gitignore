@@ -1,0 +1,16 @@
+# swagger
+swagger/swagger.json
+swagger/swagger.yml
+
+# idea
+.idea
+.idea/vcs.xml
+*.iml
+*.exe
+*.exe~
+*.tmp
+
+# beego
+routers/commentsRouter_controllers.go
+oracle-service-broker.exe
+lastupdate.tmp
