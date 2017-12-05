@@ -30,9 +30,6 @@
 
 -include("autocluster.hrl").
 
--define(CREATE_SESSION_RETRIES, 10).
-
-
 %%--------------------------------------------------------------------
 %% @doc
 %% Return a list of healthy nodes registered in Consul
@@ -45,36 +42,13 @@ nodelist() ->
                              autocluster_config:get(consul_port),
                              [v1, health, service,
                               autocluster_config:get(consul_svc)],
-                             node_list_qargs(),
-                             maybe_add_acl([]),
-                             []) of
+                             node_list_qargs()) of
     {ok, Nodes} ->
-      Result = extract_nodes(
+      {ok, extract_nodes(
              filter_nodes(Nodes,
-                          autocluster_config:get(consul_include_nodes_with_warnings))),
-      {ok, Result};
-    {error, _} = Error ->
-          Error
+                          autocluster_config:get(consul_include_nodes_with_warnings)))};
+    Error       -> Error
   end.
-
-
-%% @doc Tries to create a session.
-%% if there is an Error 500 retries until ?CREATE_SESSION_RETRIES
-
--spec maybe_create_session(string(), pos_integer()) -> {ok,string()} | {error, string()}.
-maybe_create_session(Who, N) when N > 0 ->
-    case create_session(Who, autocluster_config:get(consul_svc_ttl)) of
-        {error, "500"} ->
-	    autocluster_log:warning("Error 500 while creating a Consul session, " ++
-					" ~p retries left", [N]),
-	    timer:sleep(2000),
-	    maybe_create_session(Who, N -1);
-        Value -> Value
-    end;
-maybe_create_session(_Who, _N) ->
-    lists:flatten(io_lib:format("Error while creating a Consul session,"++
-				    "reason: too many 'Error 500' ", [])).
-
 
 
 %% @doc Tries to acquire lock using a separately created session
@@ -84,15 +58,14 @@ maybe_create_session(_Who, _N) ->
 %% @end.
 -spec lock(string()) -> ok | {error, string()}.
 lock(Who) ->
-    case maybe_create_session(Who, ?CREATE_SESSION_RETRIES) of
+    case create_session(Who, autocluster_config:get(consul_svc_ttl)) of
         {ok, SessionId} ->
             start_session_ttl_updater(SessionId),
-            Now = erlang:system_time(seconds),
+            Now = time_compat:erlang_system_time(seconds),
             EndTime = Now + autocluster_config:get(lock_wait_time),
             lock(SessionId, Now, EndTime);
-
         {error, Reason} ->
-           lists:flatten(io_lib:format("Error while creating a Consul session, reason: ~p", [Reason]))
+           lists:flatten(io_lib:format("Error while creating a session, reason: ~s", [Reason]))
     end.
 
 
@@ -123,13 +96,11 @@ unlock(SessionId) ->
 register() ->
   case registration_body() of
     {ok, Body} ->
-      case autocluster_httpc:put(autocluster_config:get(consul_scheme),
+      case autocluster_httpc:post(autocluster_config:get(consul_scheme),
                                   autocluster_config:get(consul_host),
                                   autocluster_config:get(consul_port),
                                   [v1, agent, service, register],
-                                  [],
-                                  maybe_add_acl([]),
-                                  Body) of
+                                  maybe_add_acl([]), Body) of
         {ok, _} ->
               case autocluster_config:get(consul_svc_ttl) of
                   undefined -> ok;
@@ -162,10 +133,10 @@ lock(SessionId, _, EndTime) ->
         {ok, false} ->
             case get_lock_status() of
                 {ok, {SessionHeld, ModifyIndex}} ->
-                    Wait = max(EndTime - erlang:system_time(seconds), 0),
+                    Wait = max(EndTime - time_compat:erlang_system_time(seconds), 0),
                     case wait_for_lock_release(SessionHeld, ModifyIndex, Wait) of
                         ok ->
-                            lock(SessionId, erlang:system_time(seconds), EndTime);
+                            lock(SessionId, time_compat:erlang_system_time(seconds), EndTime);
                         {error, Reason} ->
                             {error, lists:flatten(io_lib:format("Error waiting for lock release, reason: ~s",[Reason]))}
                     end;
@@ -185,13 +156,11 @@ lock(SessionId, _, EndTime) ->
 -spec send_health_check_pass() -> ok.
 send_health_check_pass() ->
   Service = string:join(["service", service_id()], ":"),
-  case autocluster_httpc:put(autocluster_config:get(consul_scheme),
+  case autocluster_httpc:get(autocluster_config:get(consul_scheme),
                              autocluster_config:get(consul_host),
                              autocluster_config:get(consul_port),
                              [v1, agent, check, pass, Service],
-                             [],
-                             maybe_add_acl([]),
-                             "") of
+                             maybe_add_acl([])) of
     {ok, []} -> ok;
     {error, "500"} ->
           maybe_re_register(wait_nodelist());
@@ -238,13 +207,11 @@ wait_nodelist(N) ->
 -spec unregister() -> ok | {error, Reason :: string()}.
 unregister() ->
   Service = service_id(),
-  case autocluster_httpc:put(autocluster_config:get(consul_scheme),
+  case autocluster_httpc:get(autocluster_config:get(consul_scheme),
                              autocluster_config:get(consul_host),
                              autocluster_config:get(consul_port),
                              [v1, agent, service, deregister, Service],
-                             [],
-                             maybe_add_acl([]),
-                             "") of
+                             maybe_add_acl([])) of
     {ok, _} -> ok;
     Error   -> Error
   end.
@@ -253,14 +220,14 @@ unregister() ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% If configured, add the ACL token to the headers.
+%% If configured, add the ACL token to the query arguments.
 %% @end
 %%--------------------------------------------------------------------
 -spec maybe_add_acl(QArgs :: list()) -> list().
 maybe_add_acl(QArgs) ->
   case autocluster_config:get(consul_acl_token) of
     "undefined" -> QArgs;
-    ACL         -> lists:append(QArgs, [{"X-Consul-Token", ACL}])
+    ACL         -> lists:append(QArgs, [{token, ACL}])
   end.
 
 
@@ -275,10 +242,10 @@ maybe_add_acl(QArgs) ->
 filter_nodes(Nodes, Warn) ->
   case Warn of
     true ->
-      lists:filter(fun(Node) ->
-                    Checks = maps:get(<<"Checks">>, Node),
-                    lists:all(fun(Check) ->
-                      lists:member(maps:get(<<"Status">>, Check),
+      lists:filter(fun({struct, Node}) ->
+                    Checks = proplists:get_value(<<"Checks">>, Node),
+                    lists:all(fun({struct, Check}) ->
+                      lists:member(proplists:get_value(<<"Status">>, Check),
                                    [<<"passing">>, <<"warning">>])
                               end,
                               Checks)
@@ -311,13 +278,13 @@ extract_nodes(Data) -> extract_nodes(Data, []).
 -spec extract_nodes(ConsulResult :: list(), Nodes :: list())
     -> list().
 extract_nodes([], Nodes)    -> Nodes;
-extract_nodes([H|T], Nodes) ->
-  Service = maps:get(<<"Service">>, H),
-  Value = maps:get(<<"Address">>, Service),
+extract_nodes([{struct, H}|T], Nodes) ->
+  {struct, Service} = proplists:get_value(<<"Service">>, H),
+  Value = proplists:get_value(<<"Address">>, Service),
   NodeName = case autocluster_util:as_string(Value) of
     "" ->
-      NodeData = maps:get(<<"Node">>, H),
-      Node = maps:get(<<"Node">>, NodeData),
+      {struct, NodeData} = proplists:get_value(<<"Node">>, H),
+      Node = proplists:get_value(<<"Node">>, NodeData),
       maybe_add_domain(autocluster_util:node_name(Node));
     Address ->
       autocluster_util:node_name(Address)
@@ -334,7 +301,7 @@ extract_nodes([H|T], Nodes) ->
 %%--------------------------------------------------------------------
 -spec node_list_qargs() -> list().
 node_list_qargs() ->
-  node_list_qargs(autocluster_config:get(cluster_name)).
+  maybe_add_acl(node_list_qargs(autocluster_config:get(cluster_name))).
 
 
 %%--------------------------------------------------------------------
@@ -476,7 +443,7 @@ registration_body_maybe_add_check(Payload) ->
     -> list().
 registration_body_maybe_add_check(Payload, undefined) ->
     case registration_body_maybe_add_deregister([]) of
-        [{'DeregisterCriticalServiceAfter', _}]->
+        [{'Deregister_critical_service_after', _}]->
             autocluster_log:warning("Can't use Consul Deregister After without " ++
             "using TTL. The parameter CONSUL_DEREGISTER_AFTER will be ignored"),
             Payload;
@@ -506,7 +473,7 @@ registration_body_add_port(Payload) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Evaluate the configured value for the DeregisterCriticalServiceAfter.
+%% Evaluate the configured value for the deregister_critical_service_after.
 %% Consul removes the node after the timeout (If it is set)
 %% Check definition if it is set.
 %%
@@ -514,14 +481,14 @@ registration_body_add_port(Payload) ->
 %%--------------------------------------------------------------------
 
 registration_body_maybe_add_deregister(Payload) ->
-    DeregisterAfter = autocluster_config:get(consul_deregister_after),
-    registration_body_maybe_add_deregister(Payload, DeregisterAfter).
+    Deregister = autocluster_config:get(consul_deregister_after),
+    registration_body_maybe_add_deregister(Payload, Deregister).
 
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Evaluate the configured value for the DeregisterCriticalServiceAfter.
+%% Evaluate the configured value for the deregister_critical_service_after.
 %% Consul removes the node after the timeout (If it is set)
 %% Check definition if it is set.
 %% @end
@@ -532,11 +499,9 @@ registration_body_maybe_add_deregister(Payload) ->
     TTL :: integer() | undefined)
         -> list().
 registration_body_maybe_add_deregister(Payload, undefined) -> Payload;
-registration_body_maybe_add_deregister(Payload, DeregisterAfter) ->
-    Deregister = {'DeregisterCriticalServiceAfter',
-        list_to_atom(service_ttl(DeregisterAfter))},
-    autocluster_log:debug("Consul will deregister the service after ~p seconds in critical state~n",
-                          [DeregisterAfter]),
+registration_body_maybe_add_deregister(Payload, Deregister_After) ->
+    Deregister = {'Deregister_critical_service_after',
+        list_to_atom(service_ttl(Deregister_After))},
     Payload ++ [Deregister].
 %%--------------------------------------------------------------------
 %% @private
@@ -548,8 +513,7 @@ registration_body_maybe_add_deregister(Payload, DeregisterAfter) ->
 -spec registration_body_maybe_add_tag(Payload :: list()) -> list().
 registration_body_maybe_add_tag(Payload) ->
   Value = autocluster_config:get(cluster_name),
-  Tags = autocluster_config:get(consul_svc_tags),
-  registration_body_maybe_add_tag(Payload, Value, Tags).
+  registration_body_maybe_add_tag(Payload, Value).
 
 
 %%--------------------------------------------------------------------
@@ -557,20 +521,14 @@ registration_body_maybe_add_tag(Payload) ->
 %% @doc
 %% Check the configured value for the Cluster name, adding it as a
 %% tag if set.
-%% Also add the tags set in CONSUL_SVC_TAGS is set.
 %% @end
 %%--------------------------------------------------------------------
 -spec registration_body_maybe_add_tag(Payload :: list(),
-                                      ClusterName :: string(),
-                                      Tags :: list())
+                                      ClusterName :: string())
     -> list().
-registration_body_maybe_add_tag(Payload, "undefined", []) -> Payload;
-registration_body_maybe_add_tag(Payload, "undefined", Tags) ->
-  lists:append(Payload, [{'Tags', [list_to_atom(X) || X <- Tags]}]);
-registration_body_maybe_add_tag(Payload, Cluster, []) ->
-  lists:append(Payload, [{'Tags', [list_to_atom(Cluster)]}]);
-registration_body_maybe_add_tag(Payload, Cluster, Tags) ->
-  lists:append(Payload, [{'Tags', [list_to_atom(Cluster)] ++ [list_to_atom(X) || X <- Tags]}]).
+registration_body_maybe_add_tag(Payload, "undefined") -> Payload;
+registration_body_maybe_add_tag(Payload, Cluster) ->
+  lists:append(Payload, [{'Tags', [list_to_atom(Cluster)]}]).
 
 
 %%--------------------------------------------------------------------
@@ -695,11 +653,10 @@ maybe_add_domain(Value) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec serialize_json_body(term()) -> {ok, Payload :: binary()} | {error, atom()}.
-
 serialize_json_body([]) -> {ok, []};
 serialize_json_body(Payload) ->
-    case rabbit_json:try_encode(Payload) of
-        {ok, Body} -> {ok, rabbit_data_coercion:to_binary(Body)};
+    case rabbit_misc:json_encode(Payload) of
+        {ok, Body} -> {ok, list_to_binary(Body)};
         {error, Reason} -> {error, Reason}
     end.
 
@@ -714,9 +671,7 @@ serialize_json_body(Payload) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec get_session_id(term()) -> string().
-get_session_id(Maps) ->
-    ID = maps:get(<<"ID">>, Maps),
-    binary:bin_to_list(ID).
+get_session_id({struct, [{_, ID} | _]}) -> binary:bin_to_list(ID).
 
 
 %%--------------------------------------------------------------------
@@ -727,7 +682,7 @@ get_session_id(Maps) ->
 %%--------------------------------------------------------------------
 -spec create_session(string(), pos_integer()) -> {ok, string()} | {error, Reason::string()}.
 create_session(Name, TTL) ->
-    case consul_session_create([], maybe_add_acl([]),
+    case consul_session_create(maybe_add_acl([]),
                                [{'Name', list_to_atom(Name)},
                                 {'TTL', list_to_atom(service_ttl(TTL))}]) of
         {ok, Response} ->
@@ -744,7 +699,7 @@ create_session(Name, TTL) ->
 %%--------------------------------------------------------------------
 -spec session_ttl_update_callback(string()) -> string().
 session_ttl_update_callback(SessionId) ->
-    _ = consul_session_renew(SessionId, [], maybe_add_acl([])),
+    _ = consul_session_renew(SessionId, maybe_add_acl([])),
     SessionId.
 
 
@@ -823,7 +778,7 @@ startup_lock_path() ->
 %%--------------------------------------------------------------------
 -spec acquire_lock(string()) -> {ok, term()} | {error, string()}.
 acquire_lock(SessionId) ->
-    consul_kv_write(startup_lock_path(), [{acquire, SessionId}], maybe_add_acl([]), []).
+    consul_kv_write(startup_lock_path(), maybe_add_acl([{acquire, SessionId}]), []).
 
 
 %%--------------------------------------------------------------------
@@ -834,7 +789,7 @@ acquire_lock(SessionId) ->
 %%--------------------------------------------------------------------
 -spec release_lock(string()) -> {ok, term()} | {error, string()}.
 release_lock(SessionId) ->
-    consul_kv_write(startup_lock_path(), [{release, SessionId}], maybe_add_acl([]), []).
+    consul_kv_write(startup_lock_path(), maybe_add_acl([{release, SessionId}]), []).
 
 
 %%--------------------------------------------------------------------
@@ -847,8 +802,8 @@ release_lock(SessionId) ->
 %%--------------------------------------------------------------------
 -spec get_lock_status() -> {ok, term()} | {error, string()}.
 get_lock_status() ->
-    case consul_kv_read(startup_lock_path(), [], maybe_add_acl([])) of
-        {ok, [KeyData | _]} ->
+    case consul_kv_read(startup_lock_path(), maybe_add_acl([])) of
+        {ok, [{struct, KeyData} | _]} ->
             SessionHeld = proplists:get_value(<<"Session">>, KeyData) =/= undefined,
             ModifyIndex = proplists:get_value(<<"ModifyIndex">>, KeyData),
             {ok, {SessionHeld, ModifyIndex}};
@@ -867,8 +822,8 @@ get_lock_status() ->
 wait_for_lock_release(false, _, _) -> ok;
 wait_for_lock_release(_, Index, Wait) ->
     case consul_kv_read(startup_lock_path(),
-                        [{index, Index}, {wait, service_ttl(Wait)}],
-                        maybe_add_acl([])) of
+                        maybe_add_acl([{index, Index},
+                                       {wait, service_ttl(Wait)}])) of
         {ok, _}          -> ok;
         {error, _} = Err -> Err
     end.
@@ -883,18 +838,14 @@ wait_for_lock_release(_, Index, Wait) ->
 %% Read KV store key value
 %% @end
 %%--------------------------------------------------------------------
--spec consul_kv_read(Path, Query, Headers) -> {ok, term()} | {error, string()} when
+-spec consul_kv_read(Path, Query) -> {ok, term()} | {error, string()} when
       Path :: [autocluster_httpc:path_component()],
-      Query :: [autocluster_httpc:query_component()],
-      Headers :: [{string(), string()}].
-consul_kv_read(Path, Query, Headers) ->
+      Query :: [autocluster_httpc:query_component()].
+consul_kv_read(Path, Query) ->
     autocluster_httpc:get(autocluster_config:get(consul_scheme),
                           autocluster_config:get(consul_host),
                           autocluster_config:get(consul_port),
-                          [v1, kv] ++ Path,
-                          Query,
-                          Headers,
-                          []).
+                          [v1, kv] ++ Path, Query).
 
 
 %%--------------------------------------------------------------------
@@ -903,21 +854,17 @@ consul_kv_read(Path, Query, Headers) ->
 %% Write KV store key value
 %% @end
 %%--------------------------------------------------------------------
--spec consul_kv_write(Path, Query, Headers, Body) -> {ok, term()} | {error, string()} when
+-spec consul_kv_write(Path, Query, Body) -> {ok, term()} | {error, string()} when
       Path :: [autocluster_httpc:path_component()],
       Query :: [autocluster_httpc:query_component()],
-      Headers :: [{string(), string()}],
       Body :: term().
-consul_kv_write(Path, Query, Headers, Body) ->
+consul_kv_write(Path, Query, Body) ->
     case serialize_json_body(Body) of
         {ok, Serialized} ->
             autocluster_httpc:put(autocluster_config:get(consul_scheme),
                                   autocluster_config:get(consul_host),
                                   autocluster_config:get(consul_port),
-                                  [v1, kv] ++ Path,
-                                  Query,
-                                  Headers,
-                                  Serialized);
+                                  [v1, kv] ++ Path, Query, Serialized);
         {error, _} = Err ->
             Err
     end.
@@ -949,20 +896,16 @@ consul_kv_write(Path, Query, Headers, Body) ->
 %% Create session
 %% @end
 %%--------------------------------------------------------------------
--spec consul_session_create(Query, Headers, Body) -> {ok, term()} | {error, Reason::string()} when
+-spec consul_session_create(Query, Body) -> {ok, term()} | {error, Reason::string()} when
       Query :: [autocluster_httpc:query_component()],
-      Headers :: [{string(), string()}],
       Body :: term().
-consul_session_create(Query, Headers, Body) ->
+consul_session_create(Query, Body) ->
       case serialize_json_body(Body) of
           {ok, Serialized} ->
               autocluster_httpc:put(autocluster_config:get(consul_scheme),
                                     autocluster_config:get(consul_host),
                                     autocluster_config:get(consul_port),
-                                    [v1, session, create],
-                                    Query,
-                                    Headers,
-                                    Serialized);
+                                    [v1, session, create], Query, Serialized);
           {error, _} = Err ->
               Err
       end.
@@ -974,12 +917,9 @@ consul_session_create(Query, Headers, Body) ->
 %% Renew session TTL
 %% @end
 %%--------------------------------------------------------------------
--spec consul_session_renew(string(), [autocluster_httpc:query_component()], [{string(), string()}]) -> {ok, term()} | {error, string()}.
-consul_session_renew(SessionId, Query, Headers) ->
+-spec consul_session_renew(string(), [autocluster_httpc:query_component()]) -> {ok, term()} | {error, string()}.
+consul_session_renew(SessionId, Query) ->
   autocluster_httpc:put(autocluster_config:get(consul_scheme),
                         autocluster_config:get(consul_host),
                         autocluster_config:get(consul_port),
-                        [v1, session, renew, list_to_atom(SessionId)],
-                        Query,
-                        Headers,
-                        []).
+                        [v1, session, renew, list_to_atom(SessionId)], Query, []).

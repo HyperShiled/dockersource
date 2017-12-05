@@ -124,6 +124,4 @@ normalize(Config, Value) when Config#config.type =:= integer ->
 normalize(Config, Value) when Config#config.type =:= string ->
   autocluster_util:as_string(Value);
 normalize(Config, Value) when Config#config.type =:= proplist ->
-  autocluster_util:as_proplist(Value);
-normalize(Config, Value) when Config#config.type =:= list ->
-  autocluster_util:as_list(Value).
+  autocluster_util:as_proplist(Value).

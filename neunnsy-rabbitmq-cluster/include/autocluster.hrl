@@ -1,7 +1,6 @@
 %%==============================================================================
 %% @author Gavin M. Roy <gavinr@aweber.com>
 %% @copyright 2015-2016 AWeber Communications
-%% @copyright 2017 Pivotal Software, Inc.
 %% @end
 %%==============================================================================
 
@@ -20,9 +19,6 @@
          {config, longname,              "RABBITMQ_USE_LONGNAME",  false,        atom,    false},
          {config, node_name,             "RABBITMQ_NODENAME",      "rabbit",     string,  false},
          {config, node_type,             "RABBITMQ_NODE_TYPE",     disc,         atom,    false},
-         {config, http_proxy,            "HTTP_PROXY",             "undefined",  string,  false},
-         {config, https_proxy,           "HTTPS_PROXY",            "undefined",  string,  false},
-         {config, proxy_exclusions,      "PROXY_EXCLUSIONS",       [],           list,  false},
 
          {config, aws_autoscaling,       "AWS_AUTOSCALING",        false,        atom,    false}, %% AWS
          {config, aws_ec2_tags,          "AWS_EC2_TAGS",           [],           proplist,  false},
@@ -47,7 +43,6 @@
          {config, consul_svc_addr_nodename,   "CONSUL_SVC_ADDR_NODENAME",    false,  atom,  false},
          {config, consul_svc_port,       "CONSUL_SVC_PORT",        5672,         integer, true},
          {config, consul_svc_ttl,        "CONSUL_SVC_TTL",         30,           integer, false},
-         {config, consul_svc_tags,       "CONSUL_SVC_TAGS",        [],           list, false},
          {config, consul_deregister_after, "CONSUL_DEREGISTER_AFTER", "",        integer,    false}, %% consul deregister_critical_service_after
          {config, consul_use_longname,   "CONSUL_USE_LONGNAME",    false,        atom,    false},
 
@@ -64,7 +59,6 @@
          {config, k8s_namespace_path,    "K8S_NAMESPACE_PATH",     "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
                                                                                  string,  false},
          {config, k8s_service_name,      "K8S_SERVICE_NAME",       "rabbitmq",   string,  false},
-         %% `ip` or `hostname`
          {config, k8s_address_type,      "K8S_ADDRESS_TYPE",       "ip",         string,  false},
          {config, k8s_hostname_suffix,   "K8S_HOSTNAME_SUFFIX",    "",           string,  false},
 
@@ -74,7 +68,7 @@
          {config, etcd_prefix,           "ETCD_PREFIX",            "rabbitmq",   string,  false},
          {config, etcd_node_ttl,         "ETCD_NODE_TTL",          30,           integer, false}]).
 
--define(CONSUL_CHECK_NOTES, "rabbitmq-autocluster node check").
+-define(CONSUL_CHECK_NOTES, "RabbitMQ Auto-Cluster Plugin TTL Check").
 
 %%--------------------------------------------------------------------
 %% @doc

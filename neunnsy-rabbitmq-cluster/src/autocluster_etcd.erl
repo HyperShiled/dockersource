@@ -47,7 +47,7 @@ nodelist() ->
 %% @end.
 -spec lock(string()) -> ok | {error, string()}.
 lock(Who) ->
-    Now = erlang:system_time(seconds),
+    Now = time_compat:erlang_system_time(seconds),
     EndTime = Now + autocluster_config:get(lock_wait_time),
     lock(Who ++ " - " ++ generate_unique_string(), Now, EndTime).
 
@@ -102,7 +102,7 @@ lock(UniqueId, _, EndTime) ->
             {ok, UniqueId};
         false ->
             wait_for_lock_release(),
-            lock(UniqueId, erlang:system_time(seconds), EndTime);
+            lock(UniqueId, time_compat:erlang_system_time(seconds), EndTime);
         {error, Reason} ->
             {error, lists:flatten(io_lib:format("Error while acquiring the lock, reason: ~p", [Reason]))}
     end.
@@ -161,20 +161,23 @@ startup_lock_path() ->
 %%
 -spec extract_nodes(list(), list()) -> [node()].
 extract_nodes([], Nodes) -> Nodes;
-extract_nodes([H|T], Nodes) ->
-  extract_nodes(T, lists:append(Nodes, [get_node_from_key(maps:get(<<"key">>, H))])).
+extract_nodes([{struct, H}|T], Nodes) ->
+  extract_nodes(T, lists:append(Nodes, [get_node_from_key(proplists:get_value(<<"key">>, H))])).
 
 %% @doc Return the list of erlang nodes
 %% @end
 %%
 -spec extract_nodes(list()) -> [node()].
 extract_nodes([]) -> [];
-extract_nodes(Nodes) ->
-  Dir = maps:get(<<"node">>, Nodes),
-  case maps:get(<<"nodes">>, Dir, undefined) of
+extract_nodes({struct, Nodes}) ->
+  {struct, Dir} = proplists:get_value(<<"node">>, Nodes),
+  case proplists:get_value(<<"nodes">>, Dir) of
     undefined -> [];
     Values    -> extract_nodes(Values, [])
-  end.
+  end;
+extract_nodes(Miss) ->
+  io:format("Unparsed: ~p~n", [Miss]),
+  [].
 
 
 %% @doc Given an etcd key, return the erlang node name
@@ -190,14 +193,12 @@ get_node_from_key(V) ->
   Path = string:concat(autocluster_httpc:build_path(lists:sublist(nodes_path(), 3, 3)), "/"),
   autocluster_util:node_name(string:substr(binary_to_list(V), length(Path))).
 
-
-
 %% @doc Generate random string. We are using it for compare-and-change
 %% operations in etcd.
 %% @end
 -spec generate_unique_string() -> string().
 generate_unique_string() ->
-    [ $a - 1 + rand:uniform(26) || _ <- lists:seq(1, 32) ].
+    [ $a - 1 + rand_compat:uniform(26) || _ <- lists:seq(1, 32) ].
 
 %% @doc Tries to acquire a lock in etcd. This can either succeed, fail
 %% because somebody else is holding the lock, or completely file due

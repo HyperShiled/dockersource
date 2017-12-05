@@ -13,8 +13,7 @@
          get/5,
          get/7,
          post/6,
-         put/6,
-         put/7]).
+         put/6]).
 
 %% Export all for unit tests
 -ifdef(TEST).
@@ -173,27 +172,6 @@ put(Scheme, Host, Port, Path, Args, Body) ->
 
 
 %% @public
-%% @spec put(Scheme, Host, Port, Path, Args, Headers, Body) -> Result
-%% @where Scheme  = string(),
-%%        Host    = string(),
-%%        Port    = integer(),
-%%        Path    = string(),
-%%        Args    = proplist(),
-%%        Headers = proplist(),
-%%        Body    = string(),
-%%        Result  = {ok, mixed}|{error, Reason::string()}
-%% @doc Perform a HTTP PUT request
-%% @end
-%%
-put(Scheme, Host, Port, Path, Args, Headers, Body) ->
-  URL = build_uri(Scheme, Host, Port, Path, Args),
-  autocluster_log:debug("PUT ~s [~p] [~p]", [URL, Headers, Body]),
-  Response = httpc:request(put, {URL, Headers, ?CONTENT_URLENCODED, Body}, [], []),
-  autocluster_log:debug("Response: [~p]", [Response]),
-  parse_response(Response).
-
-
-%% @public
 %% @spec delete(Scheme, Host, Port, Path, Args, Body) -> Result
 %% @where Scheme = string(),
 %%        Host   = string(),
@@ -220,14 +198,11 @@ delete(Scheme, Host, Port, Path, Args, Body) ->
 %%
 decode_body(_, []) -> [];
 decode_body(?CONTENT_JSON, Body) ->
-    case rabbit_json:try_decode(rabbit_data_coercion:to_binary(Body)) of
-        {ok, Value} -> Value;
-        {error, Err}  ->
-            autocluster_log:error("HTTP client could not decode a JSON payload "
-                                  "(JSON parser returned an error): ~p.~n",
-                                  [Err]),
-            {ok, []}
-    end.
+  case rabbit_misc:json_decode(autocluster_util:as_string(Body)) of
+    {ok, Value} -> Value;
+    error       -> []
+  end.
+
 
 %% @private
 %% @spec parse_response(Response) -> {ok, string()} | {error, mixed}

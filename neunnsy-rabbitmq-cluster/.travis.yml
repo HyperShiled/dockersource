@@ -1,8 +1,10 @@
 language: erlang
 
 otp_release:
-  - 19.2
-  - 19.3
+  # Primary target
+  - 17.5
+  # Secondary target - runing PropEr tests and checking compatibily with modern erlang
+  - 19.1
 
 addons:
   apt:

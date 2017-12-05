@@ -1,47 +1,13 @@
 RabbitMQ Autocluster
 ====================
 
-What it Does
-------------
+A RabbitMQ plugin that clusters nodes automatically using a number of peer discovery mechanisms:
 
-This plugin provides a mechanism for peer node discovery in RabbitMQ
-clusters. It also supports a few opinionated features around cluster
-formation and "permanently unavailable" node detection.
-
-Note for RabbitMQ 3.7.x Users
------------------------------
-
-Starting with RabbitMQ 3.7.0 (including previews and recent [snapshot builds](http://www.rabbitmq.com/snapshots.html)),
-this plugin was superseded by a [new peer discovery subsystem](http://next.rabbitmq.com/cluster-formation.html)
-built on the same ideas and supporting the same backends via separate plugins.
-
-Supported Discovery Backends
-----------------------------
-
-Nodes using this plugin will discover its peers on boot and (optionally) register with
-one of the supported backends:
-
-  * [AWS EC2 instance tags](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html)
-  * [AWS Autoscaling Groups](https://aws.amazon.com/autoscaling/)
-  * [Kubernetes](https://kubernetes.io/)
-  * DNS A records
-  * [Consul](https://consul.io)
-  * [etcd](https://github.com/coreos/etcd)
-
-If at least one peer node has been discovered, cluster formation proceeds as usual,
-otherwise the node is considered to be the first one to come up and becomes the seed node.
-
-To avoid a natural race condition around seed node "election" when a newly formed cluster
-first boots, peer discovery backends use either randomized delays or a locking mechanism.
-
-Some backends support node health checks. Nodes not reporting their status periodically
-are considered to be in an errored state. If the user opts in, such nodes can be automatically
-removed from the cluster. This is useful for deployments that use AWS autoscaling groups
-or similar IaaS features, for example.
-
-This plugin only covers cluster formation and does not change how RabbitMQ clusters
-operate once formed.
-
+* [Consul](https://consul.io),
+* [etcd2](https://github.com/coreos/etcd),
+* DNS A records,
+* [AWS EC2 tags](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html),
+* [AWS Autoscaling Groups](https://aws.amazon.com/autoscaling/).
 
 **Note:** This plugin is not a replacement for first-hand knowledge of
 how to manually create a RabbitMQ cluster. If you run into issues
@@ -65,21 +31,19 @@ There are two branches in this repository that target different RabbitMQ
 release series:
 
 * [stable](https://github.com/rabbitmq/rabbitmq-autocluster/tree/stable) targets RabbitMQ ``3.6.x`` (current ``stable`` RabbitMQ branch)
-* [master](https://github.com/rabbitmq/rabbitmq-autocluster/tree/master) is compatible with RabbitMQ ``3.7.x`` (current ``master`` RabbitMQ branch)
-  but this plugin was superseded by a [new peer discovery subsystem](http://next.rabbitmq.com/cluster-formation.html) built on the
-  same ideas.
+* [master](https://github.com/rabbitmq/rabbitmq-autocluster/tree/master) targets RabbitMQ ``3.7.x`` (current ``master`` RabbitMQ branch).
 
 Please take this into account when building this plugin from source.
 
 Please also note that key ideas of this plugin have been incorporated into RabbitMQ master
 branch and will be included into `3.7.0`. This plugin therefore will become a collection
-of backends (e.g. AWS and etcd) rather than a wholesale alternative cluster formation implementation.
+of backends (e.g. AWS and etcd2) rather than a wholesale alternative cluster formation implementation.
 
 
 Supported Erlang Versions
 -------------------------
 
-This plugin requires Erlang/OTP 18.3 or later.
+This plugin requires Erlang/OTP 17.5 or later.
 Also see the [RabbitMQ Erlang version requirements](http://next.rabbitmq.com/which-erlang.html) guide.
 
 
@@ -89,10 +53,10 @@ Binary Releases
 Binary releases of autocluster can be found on the
 [GitHub Releases](https://github.com/rabbitmq/rabbitmq-autocluster/releases) page.
 
-The most recent release is [0.10.0](https://github.com/rabbitmq/rabbitmq-autocluster/releases/tag/0.10.0) that
-targets RabbitMQ `3.6.12` or later.
+The most recent release is [0.7.0](https://github.com/rabbitmq/rabbitmq-autocluster/releases/tag/0.7.0) that
+targets RabbitMQ `3.6.9` or later.
 
-See [release notes](https://github.com/rabbitmq/rabbitmq-autocluster/releases) for details.
+Check for version compatibility in the release notes.
 
 
 Installation
@@ -100,16 +64,14 @@ Installation
 
 This plugin is installed the same way as [other RabbitMQ plugins](http://www.rabbitmq.com/plugins.html).
 
-1. Place both ``autocluster-{version}.ez`` and the ``rabbitmq_aws-{version}.ez`` plugin files in the [RabbitMQ plugins directory](http://www.rabbitmq.com/relocate.html).
-2. Enable the plugin, e.g. with ``rabbitmq-plugins enable autocluster --offline``.
+1. Place both ``autocluster-%%VSN%%.ez`` and the ``rabbitmq_aws-%%VSN%%.ez`` plugin files in the RabbitMQ plugins directory.
+2. Run ``rabbitmq-plugins enable autocluster``.
 3. Configure the plugin.
-4. Start the node.
 
-Alternatively, there is a pre-built Docker Image available at on DockerHub as [pivotalrabbitmq/rabbitmq-autocluster](https://hub.docker.com/r/pivotalrabbitmq/rabbitmq-autocluster/).
+Alternatively, there is a pre-built Docker Image available at on DockerHub as [aweber/rabbitmq-autocluster](https://hub.docker.com/r/aweber/rabbitmq-autocluster/).
 
-Note that plugin does not have a default backend configured. A little bit of configuration
-is therefore mandatory regardless of the backend used.
-
+**Note**
+As of version ``0.5`` the autocluster plugin does not have a default backend configured. See the [Project Wiki](https://github.com/rabbitmq/rabbitmq-autocluster/wiki) for configuration details.
 
 Configuration
 -------------
@@ -144,7 +106,7 @@ The following settings are available for all service discovery backends:
 
 <dl>
   <dt>Backend Type</dt>
-  <dd>Which type of service discovery backend to use. One of <code>aws</code>, <code>consul</code>, <code>dns</code>, <code>etcd</code> or <code>k8s</code>.</dd>
+  <dd>Which type of service discovery backend to use. One of <code>aws</code>, <code>consul</code>, <code>dns</code>, or <code>etcd</code>.</dd>
   <dt>Startup Delay</dt>
   <dd>To prevent a race condition when creating a new cluster for the first time, the startup delay performs a random sleep that should cause nodes to start in a slightly random offset from each other. The setting lets you control the maximum value for the startup delay.</dd>
   <dt>Failure Mode</dt>
@@ -165,14 +127,6 @@ The following settings are available for all service discovery backends:
   <dd>If cluster cleanup is enabled, this is the interval that specifies how often to look for dead nodes to remove (in seconds). <em>Added in v0.5</em></dd>
   <dt>Cleanup Warn Only</dt>
   <dd>If set, the plugin will only warn about nodes that it would cleanup and will not perform any destructive actions on the cluster. <em>Added in v0.5</em></dd>
-  <dt>HTTP Proxy</dt>
-  <dd>If set, the given HTTP URL will be used as a proxy to connect to the service discovery backend.</dd>
-  <dt>HTTPS Proxy</dt>
-  <dd>If set, the given HTTPS URL will be used as a proxy to connect to the service discovery backend.</dd>
-  <dt>Proxy Exclusions</dt>
-  <dd>List of host names which shouldn't use any proxy.</dd>
-  <dd>When using environment variables, the NoProxy list must be provided as a comma separated string: <code>PROXY_EXCLUSIONS="localhost, 127.0.0.1"</code></dd>
-
   <dl/>
 
 #### Settings Details
@@ -356,7 +310,7 @@ packages:
 - docker-engine
 runcmd:
 - docker run -d --name rabbitmq --net=host -p 4369:4369 -p 5672:5672 -p 15672:15672 -p 25672:25672 gavinmroy/rabbitmq-autocluster
-```
+```                                    
 ### Consul configuration
 
 The following settings impact the configuration of the [Consul](http://consul.io) backend for the autocluster plugin:
@@ -385,18 +339,9 @@ The following settings impact the configuration of the [Consul](http://consul.io
   <dt>Consul Use Longname</dt>
   <dd>When node names are registered with Consul, instead of FQDN's addresses, this option allows to append <em>.node.<consul_domain></em> to the node names retrieved from Consul.</dd>
   <dt>Consul Domain</dt>
-  <dd>The domain suffix appended to peer node hostname when long node names are used (see above).</dd>
+  <dd>The domain name appended when Consul longnames are used.</dd>
   <dt>Service TTL</dt>
-  <dd>Used to specify the Consul <a href="https://www.consul.io/docs/agent/checks.html">health check</a> interval that is used to let Consul know that RabbitMQ is alive an healthy.</dd>
-  <dt>Service Tags</dt>
-  <dd>Used to specify the Consul <a href="https://www.consul.io/api/agent/service.html#tags">service tags</a>. If a cluster name is specified, the tags specified here are added to the cluster name tag</dd>
-  <dt>Service unregistration timeout</dt>
-  <dd>How soon should Consul unregister a node that's failing its health check? The value is in second and cannot be lower than 60.</dd>
-  <dt>Include nodes that fail Consul health checks?</dt>
-  <dd>
-    If set to `true`, nodes that fail their health checks with Consul will still be included
-    into discovery results.
-  </dd>
+  <dd>Used to specify the Consul health check TTL interval that is used to let Consul know that RabbitMQ is alive an healthy.</dd>
 </dl>
 
 #### Configuration Details
@@ -413,11 +358,8 @@ The following settings impact the configuration of the [Consul](http://consul.io
 | Service Auto Address by NIC  | ``CONSUL_SVC_ADDR_NIC``   | ``consul_svc_addr_nic``    | ``string``  |               |
 | Service Port                 | ``CONSUL_SVC_PORT``       | ``consul_svc_port``        | ``integer`` | ``5672``      |
 | Service TTL                  | ``CONSUL_SVC_TTL``        | ``consul_svc_ttl``         | ``integer`` | ``30``        |
-| Service Tags                 | ``CONSUL_SVC_TAGS``       | ``consul_svc_tags``        | ``list``    | ``[]``        |
-| Service unregistration timeout | ``CONSUL_DEREGISTER_AFTER`` | ``consul_deregister_after`` | ``integer`` | ``60``     |
 | Consul Use Longname          | ``CONSUL_USE_LONGNAME``   | ``consul_use_longname``    | ``boolean`` | ``false``     |
 | Consul Domain                | ``CONSUL_DOMAIN``         | ``consul_domain``          | ``string``  | ``consul``    |
-| Include nodes that fail Consul health checks? | ``CONSUL_INCLUDE_NODES_WITH_WARNINGS`` | ``consul_include_nodes_with_warnings`` | ``boolean`` | ``false`` |
 
 #### Example rabbitmq.config
 
@@ -484,7 +426,7 @@ The [example](https://github.com/rabbitmq/rabbitmq-autocluster/tree/stable/examp
 how to create a dynamic RabbitMQ cluster using:
 
  * [Docker compose](https://docs.docker.com/compose/)
- * [Consul](https://www.consul.io)
+ * [Consul](https://www.consul.io) 
  * [HA proxy](https://github.com/docker/dockercloud-haproxy)
 
 ### DNS configuration
@@ -541,65 +483,125 @@ inet,4,
 
 The following settings apply to the [etcd](https://coreos.com/etcd/docs/latest/) backend only:
 
-<dl>
-  <dt>etcd Scheme</dt>
-  <dd>The URI scheme to use when connecting to etcd</dd>
-  <dt>etcd Host</dt>
-  <dd>The hostname to use when connecting to etcd's API</dd>
-  <dt>etcd Port</dt>
-  <dd>The port to connect to when using to etcd's API</dd>
-  <dt>etcd Key Prefix</dt>
-  <dd>The prefix used when storing cluster membership keys in etcd</dd>
-  <dt>etcd Node TTL</dt>
-  <dd>Used to specify how long a node can be down before it is removed from etcd's list of RabbitMQ nodes in the cluster</dd>
-</dl>
+**NOTE** The etcd backend only supports etcd v2.
 
-| Setting         | Environment Variable | Setting Key     | Type        | Default       |
-|-----------------|----------------------|-----------------|-------------|---------------|
-| etcd Scheme     | ``ETCD_SCHEME``      | ``etcd_scheme`` | ``list``    | ``http``      |
-| etcd Host       | ``ETCD_HOST``        | ``etcd_host``   | ``list``    | ``localhost`` |
-| etcd Port       | ``ETCD_PORT``        | ``etcd_port``   | ``int``     | ``2379``      |
-| etcd Key Prefix | ``ETCD_PREFIX``      | ``etcd_prefix`` | ``list``    | ``rabbitmq``  |
-| etcd Node TTL   | ``ETCD_TTL``         | ``etcd_ttl``    | ``integer`` | ``30``        |
+**etcd URL Scheme**
 
-**NOTE** The etcd backend supports etcd v2 and v3.
+The URI scheme to use when connecting to etcd
+
+| Environment Variable | ``ETCD_SCHEME``        |
+|----------------------|------------------------|
+| Setting Key          | ``etcd_scheme``        |
+| Data type            | ``list``               |
+| Default Value        | ``http``               |
+
+**etcd Host**
+
+The hostname to use when connecting to etcd's API
+
+| Environment Variable | ``ETCD_HOST``          |
+|----------------------|------------------------|
+| Setting Key          | ``etcd_host``          |
+| Data type            | ``list``               |
+| Default Value        | ``localhost``          |
+
+**etcd Port**
+
+The port to connect to when using to etcd's API
+
+| Environment Variable | ``ETCD_PORT``          |
+|----------------------|------------------------|
+| Setting Key          | ``etcd_port``          |
+| Data type            | ``int``                |
+| Default Value        | ``2379``               |
+
+**etcd Key Prefix**
+
+The prefix used when storing cluster membership keys in etcd
+
+| Environment Variable | ``ETCD_PREFIX``         |
+|----------------------|-------------------------|
+| Setting Key          | ``etcd_prefix``         |
+| Data type            | ``list``                |
+| Default Value        | ``rabbitmq``            |
+
+**etcd Node TTL**
+
+Used to specify how long a node can be down before it is removed from etcd's
+list of RabbitMQ nodes in the cluster
+
+| Environment Variable | ``ETCD_TTL``            |
+|----------------------|-------------------------|
+| Setting Key          | ``etcd_ttl``            |
+| Data type            | ``integer``             |
+| Default Value        | ``30``                  |
 
 ### K8S configuration
 
 The following settings impact the configuration of the [Kubernetes](http://kubernetes.io) backend for the autocluster plugin:
 
-<dl>
-  <dt>K8S Scheme</dt>
-  <dd>The URI scheme to use when connecting to Kubernetes API server</dd>
-  <dt>K8S Host</dt>
-  <dd>The hostname of the kubernetes API server</dd>
-  <dt>K8S Port</dt>
-  <dd>The port ot use when connecting to kubernetes API server</dd>
-  <dt>K8S Token Path</dt>
-  <dd>The token path of the Pod's service account</dd>
-  <dt>K8S Cert Path</dt>
-  <dd>The path of the service account authentication certificate with the k8s API server</dd>
-  <dt>K8S Namespace Path</dt>
-  <dd>The path of the service account namespace file</dd>
-  <dt>K8S Service Name</dt>
-  <dd>The rabbitmq service name in Kubernetes</dd>
-  <dt>K8S Adddress Type</dt>
-  <dd>The address type, either ip or hostname</dd>
-  <dt>K8S Hostname Suffix</dt>
-  <dd>The suffix to append to the hostname</dd>
-</dl>
+K8S Scheme
+The URI scheme to use when connecting to Kubernetes API server
 
-| Setting             | Environment Variable    | Setting Key             | Type        | Default                                                     |
-|---------------------|-------------------------|-------------------------|-------------|-------------------------------------------------------------|
-| K8S Scheme          | ``K8S_SCHEME``          | ``k8s_scheme``          | ``string``  | ``https``                                                   |
-| K8S Host            | ``K8S_HOST``            | ``k8s_host``            | ``string``  | ``kubernetes.default.svc.cluster.local``                    |
-| K8S Port            | ``K8S_PORT``            | ``k8s_port``            | ``integer`` | ``443``                                                     |
-| K8S Token Path      | ``K8S_TOKEN_PATH``      | ``k8s_token_path``      | ``string``  | ``/var/run/secrets/kubernetes.io/serviceaccount/token``     |
-| K8S Cert Path       | ``K8S_CERT_PATH``       | ``k8s_cert_path``       | ``string``  | ``/var/run/secrets/kubernetes.io/serviceaccount/ca.crt``    |
-| K8S Namespace Path  | ``K8S_NAMESPACE_PATH``  | ``k8s_namespace_path``  | ``string``  | ``/var/run/secrets/kubernetes.io/serviceaccount/namespace`` |
-| K8S Service Name    | ``K8S_SERVICE_NAME``    | ``k8s_service_name``    | ``string``  | ``rabbitmq``                                                |
-| K8S Adddress Type   | ``K8S_ADDRESS_TYPE``    | ``k8s_address_type``    | ``string``  | ``ip``                                                      |
-| K8S Hostname Suffix | ``K8S_HOSTNAME_SUFFIX`` | ``k8s_hostname_suffix`` | ``string``  |                                                             |
+| Environment Variable | ``K8S_SCHEME``         |
+|----------------------|------------------------|
+| Setting Key          | ``k8s_scheme``         |
+| Data type            | ``string``             |
+| Default Value        | ``https``              |
+
+K8S Host
+The hostname of the kubernetes API server
+
+| Environment Variable | ``K8S_HOST``                             |
+|----------------------|------------------------------------------|
+| Setting Key          | ``k8s_host``                             |
+| Data type            | ``string``                               |
+| Default Value        | ``kubernetes.default.svc.cluster.local`` |
+
+K8S Port
+The port ot use when connecting to kubernetes API server
+
+| Environment Variable | ``K8S_PORT``           |
+|----------------------|------------------------|
+| Setting Key          | ``k8s_port``           |
+| Data type            | ``integer``            |
+| Default Value        | ``443``                |
+
+K8S Token Path
+The token path of the Pod's service account
+
+| Environment Variable | ``K8S_TOKEN_PATH``                                      |
+|----------------------|---------------------------------------------------------|
+| Setting Key          | ``k8s_token_path``                                      |
+| Data type            | ``string``                                              |
+| Default Value        | ``/var/run/secrets/kubernetes.io/serviceaccount/token`` |
+
+K8S Cert Path
+The path of the service account authentication certificate with the k8s API server
+
+| Environment Variable | ``K8S_CERT_PATH``                                        |
+|----------------------|----------------------------------------------------------|
+| Setting Key          | ``k8s_cert_path``                                        |
+| Data type            | ``string``                                               |
+| Default Value        | ``/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`` |
+
+K8S Namespace Path
+The path of the service account namespace file
+
+| Environment Variable | ``K8S_NAMESPACE_PATH``                                      |
+|----------------------|-------------------------------------------------------------|
+| Setting Key          | ``k8s_namespace_path``                                      |
+| Data type            | ``string``                                                  |
+| Default Value        | ``/var/run/secrets/kubernetes.io/serviceaccount/namespace`` |
+
+K8S Service Name
+The rabbitmq service name in Kubernetes
+
+| Environment Variable | ``K8S_SERVICE_NAME``   |
+|----------------------|------------------------|
+| Setting Key          | ``k8s_service_name``   |
+| Data type            | ``string``             |
+| Default Value        | ``rabbitmq``           |
 
 
 #### Kubernetes Setup

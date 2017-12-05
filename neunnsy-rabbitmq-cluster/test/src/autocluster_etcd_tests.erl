@@ -4,10 +4,14 @@
 
 -include("autocluster.hrl").
 
-
 extract_nodes_test() ->
-  Values =  #{<<"action">> => <<"get">>,<<"node">> => #{<<"createdIndex">> => 4,<<"dir">> => true,<<"key">> => <<"/rabbitmq/default/nodes">>,<<"modifiedIndex">> => 4,<<"nodes">> => [#{<<"createdIndex">> => 4,<<"expiration">> => <<"2017-06-06T13:24:49.430945264Z">>,<<"key">> => <<"/rabbitmq/default/nodes/rabbit@172.17.0.7">>,<<"modifiedIndex">> => 4,<<"ttl">> => 24,<<"value">> => <<"enabled">>},#{<<"createdIndex">> => 7,<<"expiration">> => <<"2017-06-06T13:24:51.846531249Z">>,<<"key">> => <<"/rabbitmq/default/nodes/rabbit@172.17.0.5">>,<<"modifiedIndex">> => 7,<<"ttl">> => 26,<<"value">> => <<"enabled">>}]}},
-  Expectation = ['rabbit@172.17.0.7', 'rabbit@172.17.0.5'],
+  Values = {struct, [
+              {<<"node">>, {struct, [
+                {<<"nodes">>, [
+                  {struct, [{<<"key">>, <<"rabbitmq/default/nodes/foo">>}]},
+                  {struct, [{<<"key">>, <<"rabbitmq/default/nodes/bar">>}]},
+                  {struct, [{<<"key">>, <<"rabbitmq/default/nodes/hare@baz">>}]}]}]}}]},
+  Expectation = ['rabbit@foo', 'rabbit@bar', 'hare@baz'],
   ?assertEqual(Expectation, autocluster_etcd:extract_nodes(Values)).
 
 base_path_test() ->
@@ -17,9 +21,11 @@ base_path_test() ->
 get_node_from_key_test() ->
   ?assertEqual('rabbit@foo', autocluster_etcd:get_node_from_key(<<"rabbitmq/default/nodes/foo">>)).
 
+get_node_from_key_full_name_test() ->
+  ?assertEqual('hare@foo', autocluster_etcd:get_node_from_key(<<"rabbitmq/default/nodes/hare@foo">>)).
+
 get_node_from_key_leading_slash_test() ->
   ?assertEqual('rabbit@foo', autocluster_etcd:get_node_from_key(<<"/rabbitmq/default/nodes/foo">>)).
-
 
 node_path_test() ->
   autocluster_testing:reset(),
@@ -27,17 +33,17 @@ node_path_test() ->
   ?assertEqual(Expectation, autocluster_etcd:node_path()).
 
 nodelist_without_existing_directory_test_() ->
-  EtcdNodesResponse = [{<<"action">>,<<"get">>},
+  EtcdNodesResponse = {struct,[{<<"action">>,<<"get">>},
                                {<<"node">>,
-                                   [{<<"key">>,<<"/rabbitmq/default">>},
+                                {struct,[{<<"key">>,<<"/rabbitmq/default">>},
                                          {<<"dir">>,true},
                                          {<<"nodes">>,
-                                          [[{<<"key">>,<<"/rabbitmq/default/docker-autocluster-4">>},
+                                          [{struct,[{<<"key">>,<<"/rabbitmq/default/docker-autocluster-4">>},
                                                     {<<"value">>,<<"enabled">>},
                                                     {<<"expiration">>, <<"2016-07-04T12:47:17.245647965Z">>},
                                                     {<<"ttl">>,23},
                                                     {<<"modifiedIndex">>,3976},
-                                                    {<<"createdIndex">>,3976}]]}]}],
+                                                    {<<"createdIndex">>,3976}]}]}]}}]},
   autocluster_testing:with_mock(
     [autocluster_httpc],
     [{"etcd backend creates directory when it's missing",

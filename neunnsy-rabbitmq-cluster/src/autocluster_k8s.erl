@@ -76,7 +76,6 @@ make_request() ->
       [{"Authorization", "Bearer " ++ binary_to_list(Token1)}],
       [{ssl, [{cacertfile, autocluster_config:get(k8s_cert_path)}]}]).
 
-
 %% @spec node_name(k8s_endpoint) -> list()  
 %% @doc Return a full rabbit node name, appending hostname suffix
 %% @end
@@ -92,15 +91,15 @@ node_name(Address) ->
 %% @end
 %%
 maybe_ready_address(Subset) ->
-    case  maps:get(<<"notReadyAddresses">>, Subset, undefined) of
+    case proplists:get_value(<<"notReadyAddresses">>, Subset) of
       undefined -> ok;
       NotReadyAddresses ->
             Formatted = string:join([binary_to_list(get_address(X))
-                                     || X <- NotReadyAddresses], ", "),
+                                     || {struct, X} <- NotReadyAddresses], ", "),
             autocluster_log:info("k8s endpoint listing returned nodes not yet ready: ~s",
                                  [Formatted])
     end,
-    case maps:get(<<"addresses">>, Subset, undefined) of
+    case proplists:get_value(<<"addresses">>, Subset) of
       undefined -> [];
       Address -> Address
     end.
@@ -109,11 +108,11 @@ maybe_ready_address(Subset) ->
 %%    see http://kubernetes.io/docs/api-reference/v1/definitions/#_v1_endpoints
 %% @end
 %%
--spec extract_node_list(term()) -> [binary()].
-extract_node_list(Response) ->
+-spec extract_node_list({struct, term()}) -> [binary()].
+extract_node_list({struct, Response}) ->
     IpLists = [[get_address(Address)
-		||  Address <- maybe_ready_address(Subset)]
-	       || Subset <- maps:get(<<"subsets">>, Response)],
+		|| {struct, Address} <- maybe_ready_address(Subset)]
+	       || {struct, Subset} <- proplists:get_value(<<"subsets">>, Response)],
     sets:to_list(sets:union(lists:map(fun sets:from_list/1, IpLists))).
 
 
@@ -129,4 +128,4 @@ base_path() ->
      autocluster_config:get(k8s_service_name)].
 
 get_address(Address) ->
-    maps:get(rabbit_data_coercion:to_binary(autocluster_config:get(k8s_address_type)), Address).
+    proplists:get_value(list_to_binary(autocluster_config:get(k8s_address_type)), Address).

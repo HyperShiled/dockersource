@@ -17,7 +17,7 @@
 #
 # Pull base image
 # ---------------
-FROM oracle/weblogic:12.2.1-developer
+FROM wchao241/weblogic:12.2.1-developer
 
 # Maintainer
 # ----------
@@ -26,6 +26,7 @@ MAINTAINER Bruno Borges <bruno.borges@oracle.com>
 # WLS Configuration (editable during build time)
 # ------------------------------
 ARG ADMIN_PASSWORD
+ARG ADMIN_NAME
 ARG DOMAIN_NAME
 ARG ADMIN_PORT
 ARG CLUSTER_NAME
@@ -36,7 +37,7 @@ ARG PRODUCTION_MODE
 # ---------------------------
 ENV ADMIN_HOST="wlsadmin" \
     NM_PORT="5556" \
-    MS_PORT="7001" \
+    MS_PORT="7002" \
     DEBUG_PORT="8453" \
     CONFIG_JVM_ARGS="-Dweblogic.security.SSL.ignoreHostnameVerification=true"
 
@@ -44,7 +45,8 @@ ENV ADMIN_HOST="wlsadmin" \
 # -----------------------------------------------------------
 ENV DOMAIN_NAME="${DOMAIN_NAME:-base_domain}" \
     DOMAIN_HOME=/u01/oracle/user_projects/domains/${DOMAIN_NAME:-base_domain} \
-    ADMIN_PORT="${ADMIN_PORT:-8001}" \
+    ADMIN_NAME="${ADMIN_NAME:-AdminServer}" \
+    ADMIN_PORT="${ADMIN_PORT:-7001}" \
     CLUSTER_NAME="${CLUSTER_NAME:-DockerCluster}" \
     debugFlag="${DEBUG_FLAG:-false}" \
     PRODUCTION_MODE="${PRODUCTION_MODE:-prod}" \
